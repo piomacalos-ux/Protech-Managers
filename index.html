@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ProTech Ops Managers</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+:root { --sidebar-w: 244px; color-scheme: light; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f4f1; }
+
+/* ── LAYOUT ── */
+.app { display: flex; height: 100vh; position: relative; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w); min-width: var(--sidebar-w);
+  background: #fff; border-right: 1px solid #e8e5df;
+  display: flex; flex-direction: column;
+  padding: 16px 10px 12px; gap: 1px;
+  overflow-y: auto; z-index: 20;
+  transition: transform 0.25s ease;
+}
+.sidebar-logo { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #111; padding: 0 8px; margin-bottom: 10px; }
+.sidebar-logo span { font-size: 11px; font-weight: 400; color: #bbb; }
+.sync-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; padding: 2px 7px; border-radius: 20px;
+  margin-left: auto; font-weight: 500;
+}
+.sync-badge.on  { background: #dcfce7; color: #166534; }
+.sync-badge.off { background: #f3f4f6; color: #9ca3af; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.section-label { font-size: 10px; font-weight: 600; color: #ccc; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 10px 4px; }
+.agent-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 10px; border: none;
+  background: transparent; cursor: pointer; text-align: left;
+  color: #222; font-family: inherit; transition: background 0.1s; width: 100%; min-height: 52px;
+}
+.agent-btn:hover { background: #f5f4f1; }
+.agent-btn.active { background: #edeae4; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; position: relative; overflow: hidden; }
+.online-dot { width: 9px; height: 9px; background: #22c55e; border-radius: 50%; border: 2px solid #fff; position: absolute; bottom: 0; right: 0; }
+.agent-info { flex: 1; min-width: 0; }
+.agent-name {
+  font-size: 13px; font-weight: 500; color: #111;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  outline: none; border-radius: 4px; cursor: text;
+}
+.agent-name:focus { background: #f0ede8; padding: 0 4px; margin: 0 -4px; overflow: visible; white-space: nowrap; }
+.agent-name.ph { color: #c0bcb5; font-style: italic; font-weight: 400; }
+.agent-title { font-size: 10.5px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.sidebar-footer { margin-top: auto; padding-top: 10px; border-top: 1px solid #f0ede8; }
+.foot-btn {
+  width: 100%; padding: 7px 10px; background: transparent; border: none;
+  border-radius: 8px; font-size: 12px; color: #bbb; cursor: pointer;
+  text-align: left; font-family: inherit; display: flex; align-items: center; gap: 8px; margin-bottom: 2px;
+}
+.foot-btn:hover { background: #f5f4f1; color: #666; }
+
+/* ── CHAT PANEL ── */
+.chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.chat-header {
+  background: #fff; border-bottom: 1px solid #e8e5df;
+  padding: 0 16px; height: 56px;
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.hamburger { display: none; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; color: #666; font-size: 20px; line-height: 1; flex-shrink: 0; }
+.hamburger:hover { background: #f5f4f1; }
+.header-avatar { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
+.header-info { flex: 1; min-width: 0; }
+.header-info h2 { font-size: 14px; font-weight: 500; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-info p { font-size: 11px; color: #aaa; margin-top: 1px; }
+.header-dot { width: 7px; height: 7px; background: #22c55e; border-radius: 50%; flex-shrink: 0; display: none; }
+
+.no-selection { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #f9f8f5; color: #ccc; }
+.no-selection svg { opacity: 0.35; }
+.no-selection span { font-size: 13px; }
+
+.messages-area { flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; background: #f9f8f5; scroll-behavior: smooth; }
+
+/* welcome */
+.welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px 20px; gap: 6px; }
+.welcome-avatar { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; margin-bottom: 6px; border: 2px solid #e8e4de; }
+.welcome h3 { font-size: 16px; font-weight: 500; color: #222; }
+.welcome .title-tag { font-size: 11px; color: #999; background: #edeae4; padding: 3px 10px; border-radius: 20px; margin-bottom: 4px; }
+.welcome p { font-size: 13px; color: #888; max-width: 260px; line-height: 1.6; }
+.starters { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+.starter { padding: 7px 13px; background: #fff; border: 1px solid #e2dfd9; border-radius: 20px; font-size: 12px; color: #444; cursor: pointer; font-family: inherit; transition: background 0.1s; }
+.starter:hover { background: #edeae4; border-color: #ccc; }
+
+/* messages */
+.msg { display: flex; flex-direction: column; max-width: 78%; }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.bot  { align-self: flex-start; align-items: flex-start; }
+.msg-row  { display: flex; align-items: flex-end; gap: 7px; }
+.mini-avatar { width: 22px; height: 22px; border-radius: 50%; overflow: hidden; flex-shrink: 0; margin-bottom: 2px; }
+.bubble { padding: 10px 14px; border-radius: 18px; font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+.msg.user .bubble { background: #1a1a1a; color: #fff; border-bottom-right-radius: 4px; }
+.msg.bot  .bubble { background: #fff; border: 1px solid #e5e2dc; color: #111; border-bottom-left-radius: 4px; }
+.msg.bot.loading .bubble { color: #bbb; }
+.msg-meta { font-size: 10px; color: #ccc; margin-top: 3px; padding: 0 2px; }
+.dots { display: inline-flex; gap: 4px; align-items: center; padding: 2px 0; }
+.dots span { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: bounce 1.2s infinite; }
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+
+/* input */
+.input-bar { background: #fff; border-top: 1px solid #e8e5df; padding: 10px 12px; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+.input-bar textarea {
+  flex: 1; resize: none; border: 1px solid #e0ddd6; border-radius: 14px;
+  padding: 10px 14px; font-size: 14px; font-family: inherit;
+  outline: none; line-height: 1.5; min-height: 42px; max-height: 120px;
+  overflow-y: auto; background: #fafaf8; color: #111;
+  transition: border-color 0.15s; -webkit-appearance: none;
+}
+.input-bar textarea:focus { border-color: #aaa; background: #fff; }
+.input-bar textarea::placeholder { color: #ccc; }
+.send-btn { width: 42px; height: 42px; background: #1a1a1a; border: none; border-radius: 12px; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.1s, transform 0.1s; -webkit-tap-highlight-color: transparent; }
+.send-btn:hover { opacity: 0.85; }
+.send-btn:active { transform: scale(0.93); }
+.send-btn:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+
+/* ── MODALS ── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; backdrop-filter: blur(4px); }
+.modal { background: #fff; border-radius: 18px; padding: 28px 24px; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.18); max-height: 90vh; overflow-y: auto; }
+.modal h2 { font-size: 17px; font-weight: 600; color: #111; margin-bottom: 6px; }
+.modal .sub { font-size: 13px; color: #777; line-height: 1.6; margin-bottom: 18px; }
+.field { margin-bottom: 14px; }
+.field label { font-size: 12px; font-weight: 500; color: #555; display: block; margin-bottom: 6px; }
+.field input[type="password"], .field input[type="text"], .field textarea {
+  width: 100%; padding: 10px 13px; border: 1px solid #ddd; border-radius: 10px;
+  font-size: 13px; font-family: inherit; outline: none; color: #111;
+  background: #fafaf8; transition: border-color 0.15s; resize: none;
+}
+.field input:focus, .field textarea:focus { border-color: #888; background: #fff; }
+.field .hint { font-size: 11px; color: #bbb; margin-top: 5px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+.mbtn { flex: 1; padding: 10px; border-radius: 10px; font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer; border: none; transition: opacity 0.1s; }
+.mbtn.primary { background: #1a1a1a; color: #fff; }
+.mbtn.primary:hover { opacity: 0.85; }
+.mbtn.secondary { background: #f0ede8; color: #555; }
+.mbtn.secondary:hover { background: #e8e4dd; }
+.model-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { padding: 5px 11px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1.5px solid #e0ddd6; background: #fff; color: #555; font-family: inherit; transition: all 0.1s; }
+.chip.sel { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.divider { display: flex; align-items: center; gap: 10px; margin: 18px 0; }
+.divider hr { flex: 1; border: none; border-top: 1px solid #eee; }
+.divider span { font-size: 11px; color: #ccc; white-space: nowrap; }
+.modal-note { font-size: 11px; color: #bbb; margin-top: 12px; text-align: center; line-height: 1.5; }
+.step-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+.step-tab { flex: 1; padding: 7px; border-radius: 8px; border: none; font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer; background: #f5f4f1; color: #999; transition: all 0.15s; }
+.step-tab.active { background: #1a1a1a; color: #fff; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: #1a1a1a; color: #fff; padding: 10px 18px; border-radius: 30px;
+  font-size: 13px; z-index: 200; transition: transform 0.3s ease;
+  white-space: nowrap; pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ── MOBILE ── */
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 19; backdrop-filter: blur(2px); }
+@media (max-width: 640px) {
+  :root { --sidebar-w: 268px; }
+  .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); box-shadow: 4px 0 20px rgba(0,0,0,0.12); }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.open { display: block; }
+  .hamburger { display: flex; align-items: center; justify-content: center; }
+  .chat-header { padding: 0 12px; }
+  .messages-area { padding: 14px 12px; }
+  .msg { max-width: 90%; }
+  .input-bar { padding: 8px 10px; }
+  .input-bar textarea { font-size: 16px; }
+  .modal { padding: 22px 18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Setup Modal -->
+<div class="overlay" id="setup-modal">
+  <div class="modal">
+    <div class="step-tabs">
+      <button class="step-tab active" id="tab-api" onclick="showTab('api')">① API Key</button>
+      <button class="step-tab" id="tab-sync" onclick="showTab('sync')">② Sync (optional)</button>
+    </div>
+
+    <!-- Tab: API Key -->
+    <div id="panel-api">
+      <h2>Connect Claude API</h2>
+      <p class="sub">Your key is stored only in this browser and used only to call Anthropic's API.</p>
+      <div class="field">
+        <label>Anthropic API key</label>
+        <input type="password" id="api-key-input" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <div class="hint">Get yours at <strong>console.anthropic.com</strong> → API Keys</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <div class="model-row" id="model-row">
+          <button class="chip sel" data-model="claude-haiku-4-5-20251001">Haiku (fast)</button>
+          <button class="chip" data-model="claude-sonnet-4-6">Sonnet (smart)</button>
+          <button class="chip" data-model="claude-opus-4-6">Opus (best)</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="mbtn primary" onclick="showTab('sync')">Next: Set up sync →</button>
+      </div>
+      <p class="modal-note">Or <a href="#" onclick="saveSetup(true);return false;" style="color:#aaa">skip sync and start now</a></p>
+    </div>
+
+    <!-- Tab: Sync -->
+    <div id="panel-sync" style="display:none">
+      <h2>Cross-device sync</h2>
+      <p class="sub">Enter a Firebase config and a workspace PIN — any device that has the same PIN will share your conversations. Conversations are saved automatically.</p>
+
+      <div class="field">
+        <label>Workspace PIN</label>
+        <input type="text" id="pin-input" placeholder="e.g. protech-ops-2025" autocomplete="off" spellcheck="false">
+        <div class="hint">Use the same PIN on every device. Anyone with this PIN can read your conversations.</div>
+      </div>
+
+      <div class="field">
+        <label>Firebase config (paste the whole object)</label>
+        <textarea id="fb-config-input" rows="6" placeholder='{"apiKey":"…","authDomain":"…","projectId":"…"}'
+          style="font-family:monospace;font-size:11px"></textarea>
+        <div class="hint">Firebase console → Project settings → Your apps → SDK config → Config object</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="mbtn secondary" onclick="saveSetup(true)">Skip sync, start now</button>
+        <button class="mbtn primary" onclick="saveSetup(false)">Connect &amp; start</button>
+      </div>
+      <p class="modal-note">No Firebase account? <a href="https://console.firebase.google.com" target="_blank" style="color:#aaa">Set one up free</a> — takes ~5 min</p>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div class="app">
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      ProTech <span>Operations</span>
+      <span class="sync-badge off" id="sync-badge"><span class="sync-dot"></span> offline</span>
+    </div>
+    <div class="section-label">Your team</div>
+    <div id="agent-list"></div>
+    <div class="sidebar-footer">
+      <button class="foot-btn" onclick="clearChat()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+        Clear conversation
+      </button>
+      <button class="foot-btn" onclick="showSetup()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Settings &amp; sync
+      </button>
+    </div>
+  </aside>
+
+  <main class="chat-panel">
+    <div class="chat-header">
+      <button class="hamburger" onclick="openSidebar()">&#9776;</button>
+      <div class="header-avatar" id="header-avatar"></div>
+      <div class="header-info">
+        <h2 id="header-name">ProTech Operations</h2>
+        <p id="header-sub">Select a manager to begin</p>
+      </div>
+      <div class="header-dot" id="header-dot"></div>
+    </div>
+
+    <div id="no-selection" class="no-selection">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Select a manager to start</span>
+    </div>
+    <div id="messages-area" class="messages-area" style="display:none"></div>
+    <div class="input-bar" id="input-bar" style="display:none">
+      <textarea id="msg-input" rows="1" placeholder="Ask your manager…"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      </button>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── MANAGER DATA ──────────────────────────────────────────────
+const MANAGERS = {
+  logistics:   { name:'', title:'Logistics Manager',        tag:'Shipping, carriers & delivery',    bg:'#dbe9f8', color:'#185FA5',
+    starters:['What carrier risks should I watch?','Assess our Robinson\'s logistics setup','Draft a logistics process for a new project'],
+    prompt:`You are a senior Logistics Manager at ProTech Devices — the person who owns carrier relationships, shipping performance, and freight costs. You cover carrier management, route efficiency, lead times, delivery compliance, freight cost, last-mile execution, and reverse logistics across ProTech projects (Robinson's Appliance, Field Service, Internal Ops). Ask for project details. Speak with authority — you know where logistics fails. Draft processes when asked. Concise, direct, plain text.` },
+  vendor:      { name:'', title:'Procurement Manager',      tag:'Suppliers, contracts & POs',        bg:'#fdefd6', color:'#BA7517',
+    starters:['Review my vendor setup','Flag any contract gaps','Assess vendor risk on a new project'],
+    prompt:`You are a senior Procurement Manager at ProTech Devices — you own vendor qualification, supplier contracts, and procurement governance. You cover vendor qualification, contracts, PO management, lead time reliability, QA, pricing, single-source risk, and performance tracking. Flag missing contracts and single-source dependencies clearly — these are non-negotiable risks. Draft vendor processes when asked. Concise, direct, plain text.` },
+  inventory:   { name:'', title:'Inventory Manager',        tag:'Stock, warehouse & receiving',      bg:'#e4f0d4', color:'#3B6D11',
+    starters:['Assess our inventory setup','What are our biggest stock risks?','Help me design a receiving process'],
+    prompt:`You are a senior Inventory Manager at ProTech Devices — you run warehouse operations and own inventory accuracy. You cover receiving, putaway, storage, inventory accuracy, pick/pack, serialized asset tracking, returns, and shrinkage. Be specific about gaps — cycle count discrepancies, receiving backlogs, and untracked devices are your direct concern. Draft inventory processes when asked. Concise, direct, plain text.` },
+  technical:   { name:'', title:'Tech Ops Manager',         tag:'Devices, deployment & field ops',   bg:'#e8e6f9', color:'#534AB7',
+    starters:['Review our deployment readiness','What technical risks do we have?','Help me build a tech SOP'],
+    prompt:`You are a senior Tech Ops Manager at ProTech Devices — you've led large-scale device deployments and you know where things break. You cover device provisioning, deployment planning, asset tracking, field team readiness, MDM, helpdesk support, and security compliance. Be direct about readiness gaps — an under-provisioned fleet or a field tech without proper staging is a real incident. Draft technical SOPs when asked. Concise, direct, plain text.` },
+  claims:      { name:'', title:'Claims Manager',           tag:'Claims management & ADLD',          bg:'#d4ede5', color:'#0F6E56',
+    starters:['Review our claims process','What are our ADLD risks?','Help me design a claims workflow'],
+    prompt:`You are a senior Claims Manager at ProTech Devices — you own the end-to-end claims lifecycle on the ADLD platform and you know where claims get stuck or denied incorrectly. You cover claims intake, coverage verification, documentation, adjudication, resolution routing, replacement fulfillment, communication SLAs, denial/dispute management, and ADLD reporting. A poorly designed claims process costs money and damages trust. Draft claims processes when asked. Concise, direct, plain text.` },
+  fulfillment: { name:'', title:'Fulfillment Manager',      tag:'DTC orders & returns',              bg:'#f5ddd4', color:'#993C1D',
+    starters:['Review our DTC fulfillment setup','What order risks should I fix first?','Help me draft a fulfillment process'],
+    prompt:`You are a senior Fulfillment Manager at ProTech Devices — you run DTC order operations and measure yourself by on-time shipment rates and order accuracy. You cover order intake and validation, inventory sync, pick/pack accuracy, carrier selection, delivery promise vs actual, customer communication, exception management, and returns. Every late shipment or wrong item is a customer service ticket and a potential return. Draft fulfillment processes when asked. Concise, direct, plain text.` },
+  service:     { name:'', title:'Service Center Manager',   tag:'Repairs, service & field support',  bg:'#f0e6f6', color:'#7B3FA0',
+    starters:['Review our service center setup','What are our repair turnaround risks?','Help me design a service intake process'],
+    prompt:`You are a senior Service Center Manager at ProTech Devices — you run device repair operations, service intake, and field support coordination. You cover service intake and triage, repair workflows, parts inventory, technician capacity, turnaround time (TAT), QC on repaired units, warranty vs out-of-warranty handling, escalation paths, and customer communication. A device stuck in the service queue is a failed customer promise. Draft service center SOPs when asked. Concise, direct, plain text.` },
+  ops:         { name:'', title:'Operations Manager',       tag:'Cross-functional orchestration',    bg:'#1a1a1a', color:'#f5f4f1',
+    starters:['Give me a full operational readiness check','Where are the biggest cross-functional gaps?','Help me plan ops for a new project end-to-end'],
+    prompt:`You are the Operations Manager at ProTech Devices — accountable for making the whole machine work across all domains. You orchestrate logistics, procurement, inventory, tech ops, claims, fulfillment, and service center. You identify where handoffs break down between teams, where risks compound, and what must be resolved before a project goes live. You think in end-to-end readiness — not just whether each function is set up, but whether they work together. Ask about project scope and which domains are in play. Flag cross-functional gaps clearly. Help build integrated ops plans. Strategic but specific. Concise, direct, plain text.` }
+};
+
+// ── STATE ─────────────────────────────────────────────────────
+let apiKey = '', selectedModel = 'claude-haiku-4-5-20251001';
+let workspacePin = '', firebaseApp = null, db = null;
+let syncListeners = {}; // unsubscribe fns per agentId
+let active = null, isLoading = false;
+const conversations = {}; // in-memory cache
+
+// ── LOCAL STORAGE ─────────────────────────────────────────────
+const LS_API   = 'pt_api';
+const LS_MODEL = 'pt_model';
+const LS_PIN   = 'pt_pin';
+const LS_FB    = 'pt_fb';
+const LS_NAMES = 'pt_names';
+const LS_CONV  = id => 'pt_conv_' + id;
+
+function lsSave(key, val) { try { localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val)); } catch(e){} }
+function lsGet(key)       { try { return localStorage.getItem(key); } catch(e){ return null; } }
+
+function saveConvLocal(id) { lsSave(LS_CONV(id), conversations[id] || []); }
+function loadConvLocal(id) {
+  try { const s = lsGet(LS_CONV(id)); if (s) conversations[id] = JSON.parse(s); } catch(e){}
+}
+
+function loadAllLocal() {
+  apiKey = lsGet(LS_API) || '';
+  selectedModel = lsGet(LS_MODEL) || 'claude-haiku-4-5-20251001';
+  workspacePin  = lsGet(LS_PIN)   || '';
+  // names
+  try { const n = JSON.parse(lsGet(LS_NAMES)||'{}'); Object.keys(n).forEach(id => { if (MANAGERS[id]) MANAGERS[id].name = n[id]; }); } catch(e){}
+  // convs
+  Object.keys(MANAGERS).forEach(id => loadConvLocal(id));
+  // model chip
+  document.querySelectorAll('.chip').forEach(c => { c.classList.toggle('sel', c.dataset.model === selectedModel); });
+}
+
+function saveNames() {
+  const n = {}; Object.keys(MANAGERS).forEach(id => { if (MANAGERS[id].name) n[id] = MANAGERS[id].name; });
+  lsSave(LS_NAMES, n);
+}
+
+// ── FIREBASE ──────────────────────────────────────────────────
+async function initFirebase(configStr, pin) {
+  try {
+    const config = JSON.parse(configStr);
+    if (firebaseApp) { try { firebaseApp.delete(); } catch(e){} }
+    firebaseApp = firebase.initializeApp(config, 'protech-ops-' + Date.now());
+    db = firebaseApp.firestore();
+    workspacePin = pin;
+    lsSave(LS_PIN, pin);
+    lsSave(LS_FB, configStr);
+    updateSyncBadge(true);
+    toast('Sync connected ✓');
+    // attach listener for active agent
+    if (active) attachSyncListener(active);
+    return true;
+  } catch(e) {
+    console.error('Firebase init error', e);
+    toast('Sync failed: ' + e.message);
+    return false;
+  }
+}
+
+function convPath(agentId) {
+  return db.collection('workspaces').doc(workspacePin).collection('conversations').doc(agentId);
+}
+
+function attachSyncListener(agentId) {
+  if (!db || !workspacePin) return;
+  if (syncListeners[agentId]) { syncListeners[agentId](); delete syncListeners[agentId]; }
+  syncListeners[agentId] = convPath(agentId).onSnapshot(snap => {
+    if (snap.exists) {
+      const data = snap.data();
+      if (data && data.messages) {
+        conversations[agentId] = data.messages;
+        saveConvLocal(agentId);
+        if (active === agentId) renderMessages();
+      }
+    }
+  }, err => console.warn('Sync error:', err));
+}
+
+async function syncSave(agentId) {
+  if (!db || !workspacePin) return;
+  try { await convPath(agentId).set({ messages: conversations[agentId] || [], updated: Date.now() }); } catch(e){ console.warn('Sync write failed', e); }
+}
+
+function updateSyncBadge(on) {
+  const b = document.getElementById('sync-badge');
+  b.className = 'sync-badge ' + (on ? 'on' : 'off');
+  b.innerHTML = `<span class="sync-dot"></span> ${on ? 'synced' : 'offline'}`;
+}
+
+// ── AVATAR ────────────────────────────────────────────────────
+function avatarSVG(m, size) {
+  return `<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+    <rect width="${size}" height="${size}" rx="${size/2}" fill="${m.bg}"/>
+    <circle cx="${size/2}" cy="${size*0.36}" r="${size*0.18}" fill="${m.color}"/>
+    <ellipse cx="${size/2}" cy="${size*0.88}" rx="${size*0.32}" ry="${size*0.24}" fill="${m.color}"/>
+  </svg>`;
+}
+
+// ── SIDEBAR ───────────────────────────────────────────────────
+function renderSidebar() {
+  document.getElementById('agent-list').innerHTML = Object.entries(MANAGERS).map(([id, m]) => `
+    <button class="agent-btn${active===id?' active':''}" onclick="selectManager('${id}')">
+      <div class="avatar" style="position:relative">${avatarSVG(m,36)}<div class="online-dot"></div></div>
+      <div class="agent-info">
+        <div class="agent-name${m.name?'':' ph'}" data-id="${id}" contenteditable="true" spellcheck="false"
+          onclick="event.stopPropagation()"
+          onkeydown="nameKey(event,'${id}')"
+          onblur="saveName(this,'${id}')">${m.name || 'Set name'}</div>
+        <div class="agent-title">${m.title}</div>
+      </div>
+    </button>`).join('');
+}
+
+// ── SELECT ────────────────────────────────────────────────────
+function selectManager(id) {
+  active = id; closeSidebar(); renderSidebar();
+  const m = MANAGERS[id];
+  document.getElementById('header-avatar').innerHTML = avatarSVG(m, 34);
+  document.getElementById('header-name').textContent = m.name || m.title;
+  document.getElementById('header-sub').textContent = (m.name ? m.title + ' · ' : '') + 'Online';
+  document.getElementById('header-dot').style.display = 'block';
+  document.getElementById('no-selection').style.display = 'none';
+  document.getElementById('input-bar').style.display = 'flex';
+  if (!conversations[id]) loadConvLocal(id);
+  attachSyncListener(id);
+  renderMessages();
+  setTimeout(() => document.getElementById('msg-input').focus(), 80);
+}
+
+// ── MESSAGES ──────────────────────────────────────────────────
+function renderMessages() {
+  const area = document.getElementById('messages-area');
+  area.style.display = 'flex'; area.innerHTML = '';
+  const m = MANAGERS[active];
+  if (!conversations[active] || !conversations[active].length) {
+    const w = document.createElement('div'); w.className = 'welcome';
+    w.innerHTML = `<div class="welcome-avatar">${avatarSVG(m,64)}</div>
+      <h3>${m.name || m.title}</h3>
+      ${m.name ? `<div class="title-tag">${m.title}</div>` : ''}
+      <p>Ask about a project, get an assessment, or have a process drafted.</p>
+      <div class="starters">${m.starters.map(s =>
+        `<button class="starter" onclick="useStarter('${s.replace(/'/g,"\\'")}')"> ${s}</button>`).join('')}</div>`;
+    area.appendChild(w); return;
+  }
+  conversations[active].forEach(msg => appendBubble(area, msg.role, msg.content, msg.time));
+  area.scrollTop = area.scrollHeight;
+}
+
+function appendBubble(container, role, content, time) {
+  const m = MANAGERS[active];
+  const div = document.createElement('div');
+  div.className = `msg ${role === 'user' ? 'user' : 'bot'}`;
+  if (role !== 'user') {
+    const row = document.createElement('div'); row.className = 'msg-row';
+    const mini = document.createElement('div'); mini.className = 'mini-avatar'; mini.innerHTML = avatarSVG(m,22);
+    const bub = document.createElement('div'); bub.className = 'bubble'; bub.textContent = content;
+    row.appendChild(mini); row.appendChild(bub); div.appendChild(row);
+  } else {
+    const bub = document.createElement('div'); bub.className = 'bubble'; bub.textContent = content;
+    div.appendChild(bub);
+  }
+  const meta = document.createElement('div'); meta.className = 'msg-meta';
+  meta.textContent = (role !== 'user' ? (m.name || m.title).split(' ')[0] + ' · ' : '') + (time || now());
+  div.appendChild(meta); container.appendChild(div); return div;
+}
+
+// ── SEND ──────────────────────────────────────────────────────
+async function sendMessage() {
+  if (!active || isLoading) return;
+  if (!apiKey) { showSetup(); return; }
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim(); if (!text) return;
+  input.value = ''; input.style.height = 'auto';
+  isLoading = true; document.getElementById('send-btn').disabled = true;
+
+  if (!conversations[active]) conversations[active] = [];
+  const t = now();
+  conversations[active].push({ role: 'user', content: text, time: t });
+
+  const area = document.getElementById('messages-area');
+  area.innerHTML = '';
+  conversations[active].forEach(msg => appendBubble(area, msg.role, msg.content, msg.time));
+
+  const m = MANAGERS[active];
+  const loadEl = document.createElement('div'); loadEl.className = 'msg bot loading';
+  loadEl.innerHTML = `<div class="msg-row"><div class="mini-avatar">${avatarSVG(m,22)}</div><div class="bubble"><div class="dots"><span></span><span></span><span></span></div></div></div>`;
+  area.appendChild(loadEl); area.scrollTop = area.scrollHeight;
+
+  const history = conversations[active].slice(-14)
+    .map(x => `${x.role === 'user' ? 'User' : (m.name || m.title)}: ${x.content}`).join('\n');
+  const prompt = `${m.prompt}\n\n---\nConversation:\n${history}\n\nRespond as ${m.name || m.title}.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model: selectedModel, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'No response.';
+    area.removeChild(loadEl);
+    const rt = now();
+    conversations[active].push({ role: 'bot', content: reply, time: rt });
+    appendBubble(area, 'bot', reply, rt);
+    area.scrollTop = area.scrollHeight;
+    saveConvLocal(active);
+    syncSave(active);
+  } catch(e) {
+    area.removeChild(loadEl);
+    const errMsg = (e.message.includes('401') || e.message.includes('invalid_api_key'))
+      ? 'Invalid API key — go to Settings & sync to update it.' : `Error: ${e.message}`;
+    conversations[active].push({ role: 'bot', content: errMsg, time: now() });
+    appendBubble(area, 'bot', errMsg, now());
+    area.scrollTop = area.scrollHeight;
+  }
+  isLoading = false; document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
+}
+
+// ── NAMES ─────────────────────────────────────────────────────
+function saveName(el, id) {
+  const raw = el.innerText.trim();
+  MANAGERS[id].name = (raw && raw !== 'Set name') ? raw : '';
+  el.classList.toggle('ph', !MANAGERS[id].name);
+  if (!MANAGERS[id].name) el.innerText = 'Set name';
+  saveNames();
+  if (active === id) {
+    const m = MANAGERS[id];
+    document.getElementById('header-name').textContent = m.name || m.title;
+    document.getElementById('header-sub').textContent = (m.name ? m.title + ' · ' : '') + 'Online';
+  }
+}
+function nameKey(e, id) {
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  if (e.key === 'Escape') { e.target.innerText = MANAGERS[id].name || 'Set name'; e.target.blur(); }
+}
+
+// ── SETUP MODAL ───────────────────────────────────────────────
+function showSetup() {
+  document.getElementById('setup-modal').style.display = 'flex';
+  document.getElementById('api-key-input').value = apiKey;
+  const fb = lsGet(LS_FB); if (fb) document.getElementById('fb-config-input').value = fb;
+  document.getElementById('pin-input').value = workspacePin;
+  showTab('api');
+}
+function showTab(t) {
+  document.getElementById('panel-api').style.display  = t === 'api'  ? 'block' : 'none';
+  document.getElementById('panel-sync').style.display = t === 'sync' ? 'block' : 'none';
+  document.getElementById('tab-api').classList.toggle('active',  t === 'api');
+  document.getElementById('tab-sync').classList.toggle('active', t === 'sync');
+}
+async function saveSetup(skipSync) {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key.startsWith('sk-')) { alert('Enter a valid Anthropic API key (starts with sk-).'); showTab('api'); return; }
+  apiKey = key; lsSave(LS_API, key);
+  lsSave(LS_MODEL, selectedModel);
+
+  if (!skipSync) {
+    const pin  = document.getElementById('pin-input').value.trim();
+    const fbCf = document.getElementById('fb-config-input').value.trim();
+    if (pin && fbCf) {
+      const ok = await initFirebase(fbCf, pin);
+      if (!ok) return;
+    }
+  }
+  document.getElementById('setup-modal').style.display = 'none';
+}
+
+// model chips
+document.querySelectorAll('.chip').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(x => x.classList.remove('sel'));
+    c.classList.add('sel'); selectedModel = c.dataset.model;
+  });
+});
+document.getElementById('api-key-input').addEventListener('keydown', e => { if(e.key==='Enter') saveSetup(true); });
+
+// ── HELPERS ───────────────────────────────────────────────────
+function useStarter(t) { document.getElementById('msg-input').value = t; sendMessage(); }
+function handleKey(e)  { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+function now()         { return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+function clearChat()   { if (!active) return; conversations[active]=[]; saveConvLocal(active); if(db) syncSave(active); renderMessages(); }
+function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('open'); }
+function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('open'); }
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+loadAllLocal();
+renderSidebar();
+
+// re-init Firebase if previously configured
+const savedFb = lsGet(LS_FB);
+if (savedFb && workspacePin) {
+  initFirebase(savedFb, workspacePin).catch(() => {});
+}
+
+// Show setup if no API key
+if (!apiKey) {
+  document.getElementById('setup-modal').style.display = 'flex';
+  showTab('api');
+} else {
+  document.getElementById('setup-modal').style.display = 'none';
+}
+</script>
+</body>
+</html>
