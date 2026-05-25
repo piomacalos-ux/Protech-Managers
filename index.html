@@ -54,7 +54,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 /* ── CHAT PANEL ── */
 .chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; position: relative; }
 .chat-header { background: #fff; border-bottom: 1px solid #e8e5df; padding: 0 16px; height: 56px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.hamburger { display: none; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; color: #666; font-size: 20px; line-height: 1; flex-shrink: 0; }
+.hamburger { display: none; background: none; border: none; cursor: pointer; padding: 6px 8px; border-radius: 8px; color: #444; font-size: 22px; line-height: 1; flex-shrink: 0; }
 .hamburger:hover { background: #f5f4f1; }
 .header-avatar { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
 .header-info { flex: 1; min-width: 0; }
@@ -179,7 +179,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); box-shadow: 4px 0 20px rgba(0,0,0,0.12); }
   .sidebar.open { transform: translateX(0); }
   .sidebar-overlay.open { display: block; }
-  .hamburger { display: flex; align-items: center; justify-content: center; }
+  .hamburger { display: flex; align-items: center; justify-content: center; background: #f0ede8; border-radius: 10px; margin-right: 2px; }
   .chat-header { padding: 0 12px; }
   .messages-area { padding: 14px 12px; }
   .msg { max-width: 90%; }
@@ -274,7 +274,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <div class="gc-avatars" id="gc-avatars"></div>
       <div class="agent-info">
         <div class="agent-name" style="cursor:default">Group Chat</div>
-        <div class="agent-title">All 8 managers respond</div>
+        <div class="agent-title">All managers + Secretary respond</div>
       </div>
     </button>
 
@@ -516,7 +516,7 @@ function selectGC() {
   renderSidebar();
   document.getElementById('header-avatar').innerHTML=`<svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" width="34" height="34"><rect width="34" height="34" rx="17" fill="#f5f4f1"/><text x="17" y="22" text-anchor="middle" font-size="16">👥</text></svg>`;
   document.getElementById('header-name').textContent='Group Chat';
-  document.getElementById('header-sub').textContent='All 8 managers · Online';
+  document.getElementById('header-sub').textContent='All managers & Secretary · Online';
   document.getElementById('header-dot').style.display='block';
   document.getElementById('notes-toggle').style.display='none';
   document.getElementById('no-selection').style.display='none';
@@ -574,7 +574,7 @@ function renderGCMessages(area) {
     const w=document.createElement('div'); w.className='welcome';
     w.innerHTML=`<div class="welcome-avatar" style="width:64px;height:64px;border-radius:50%;background:#f5f4f1;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:6px">👥</div>
       <h3>Group Chat</h3>
-      <p>Your message goes to all 8 managers. Each responds from their domain expertise.</p>
+      <p>Your message goes to all managers and your Secretary. Each responds from their area of expertise.</p>
       <div class="starters">
         <button class="starter" onclick="useStarter('What are the biggest operational risks we should address right now?')">What are our biggest risks right now?</button>
         <button class="starter" onclick="useStarter('Give me a readiness check across all operational areas for Robinson\'s Appliance.')">Readiness check for Robinson's</button>
@@ -587,7 +587,7 @@ function renderGCMessages(area) {
 }
 
 function appendGCResponse(container, msg) {
-  const m=MANAGERS[msg.agentId]||{bg:'#eee',color:'#666',name:'',title:msg.agentId};
+  const m=msg.agentId==='secretary'?SECRETARY:(MANAGERS[msg.agentId]||{bg:'#eee',color:'#666',name:'',title:msg.agentId});
   const label=document.createElement('div'); label.className='gc-label';
   label.textContent=(m.name||m.title);
   container.appendChild(label);
@@ -666,7 +666,10 @@ async function sendMessage() {
       .replace('{ACTIONS}', secretaryNotes.actions.map(a=>(a.done?'[x]':'[ ]')+' '+a.text).join('\n')||'None yet')
       .replace('{REMINDERS}', secretaryNotes.reminders.map(r=>r.date+': '+r.text).join('\n')||'None yet');
   }
-  const prompt=`${promptText}\n\n---\nConversation:\n${history}\n\nRespond as ${m.name||m.title}.`;
+  if(m.name) promptText=`Your name is ${m.name}.\n`+promptText;
+  // Build team roster so this manager knows the full team by name
+  const roster=Object.entries(MANAGERS).map(([id,mg])=>`${mg.name||mg.title} (${mg.title})`).join(', ')+(SECRETARY.name?`, ${SECRETARY.name} (Secretary)`:'');
+  const prompt=`${promptText}\n\nYour team: ${roster}\n\n---\nConversation:\n${history}\n\nRespond as ${m.name||m.title}.`;
 
   try {
     const reply=await callClaude(prompt);
@@ -702,12 +705,16 @@ async function sendGroupMessage() {
   area.innerHTML='';
   conversations['gc'].forEach(msg=>{ if(msg.role==='user') appendBubble(area,msg.role,msg.content,msg.time,'gc'); else appendGCResponse(area,msg); });
 
-  // Create loading indicators for all managers
+  // Build team roster so each participant knows the full team by name
+  const teamRoster=Object.entries(MANAGERS).map(([id,m])=>`${m.name||m.title} (${m.title})`).join(', ')+(SECRETARY.name?`, ${SECRETARY.name} (Secretary)`:', Secretary');
+
+  // Create loading indicators for all managers + Secretary
+  const gcParticipants={...MANAGERS, secretary: SECRETARY};
   const loadEls={};
-  Object.entries(MANAGERS).forEach(([id,m])=>{
+  Object.entries(gcParticipants).forEach(([id,m])=>{
     const label=document.createElement('div'); label.className='gc-label'; label.textContent=m.name||m.title; label.id='gc-label-'+id;
     const loadEl=document.createElement('div'); loadEl.className='msg bot loading'; loadEl.id='gc-load-'+id;
-    loadEl.innerHTML=`<div class="msg-row"><div class="mini-avatar">${avatarSVG(m,22)}</div><div class="bubble-wrap"><div class="bubble"><div class="dots"><span></span><span></span><span></span></div></div></div></div>`;
+    loadEl.innerHTML=`<div class="msg-row"><div class="mini-avatar">${id==='secretary'?`<svg viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><rect width="22" height="22" rx="11" fill="#f3e8ff"/><circle cx="11" cy="8" r="4" fill="#7B3FA0"/><ellipse cx="11" cy="19" rx="7" ry="5" fill="#7B3FA0"/></svg>`:avatarSVG(m,22)}</div><div class="bubble-wrap"><div class="bubble"><div class="dots"><span></span><span></span><span></span></div></div></div></div>`;
     area.appendChild(label); area.appendChild(loadEl);
     loadEls[id]={label,loadEl};
   });
@@ -715,9 +722,16 @@ async function sendGroupMessage() {
 
   const gcHistory=conversations['gc'].slice(-6).filter(m=>m.role==='user').map(m=>`User: ${m.content}`).join('\n');
 
-  // Fetch all in parallel
-  const promises=Object.entries(MANAGERS).map(async([id,m])=>{
-    const prompt=`${m.prompt}\n\n---\nGroup discussion context:\n${gcHistory}\n\nRespond specifically from your domain (${m.title}) perspective. Be concise — 2-4 sentences max in a group setting.`;
+  // Fetch all in parallel (managers + Secretary)
+  const promises=Object.entries(gcParticipants).map(async([id,m])=>{
+    let sysPrompt=m.prompt;
+    if(id==='secretary'){
+      sysPrompt=sysPrompt.replace('{NOTES}', secretaryNotes.notes.map(n=>n.text).join('\n')||'None yet')
+        .replace('{ACTIONS}', secretaryNotes.actions.map(a=>(a.done?'[x]':'[ ]')+' '+a.text).join('\n')||'None yet')
+        .replace('{REMINDERS}', secretaryNotes.reminders.map(r=>r.date+': '+r.text).join('\n')||'None yet');
+    }
+    if(m.name) sysPrompt=`Your name is ${m.name}.\n`+sysPrompt;
+    const prompt=`${sysPrompt}\n\nTeam: ${teamRoster}\n\n---\nGroup discussion context:\n${gcHistory}\n\nRespond specifically from your role (${m.title}) perspective. Be concise — 2-4 sentences max in a group setting.`;
     try {
       const reply=await callClaude(prompt);
       const label=document.getElementById('gc-label-'+id);
@@ -835,6 +849,18 @@ function openSidebar(){ document.getElementById('sidebar').classList.add('open')
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('open'); }
 let toastTimer;
 function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2800); }
+
+// ── SWIPE TO OPEN SIDEBAR (mobile) ───────────────────────────
+(function(){
+  let startX=0, startY=0;
+  document.addEventListener('touchstart',e=>{ startX=e.touches[0].clientX; startY=e.touches[0].clientY; },{passive:true});
+  document.addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].clientX-startX;
+    const dy=Math.abs(e.changedTouches[0].clientY-startY);
+    if(startX<28 && dx>55 && dy<60) openSidebar();   // swipe right from left edge
+    if(dx<-55 && dy<60 && document.getElementById('sidebar').classList.contains('open')) closeSidebar(); // swipe left to close
+  },{passive:true});
+})();
 
 // ── INIT ──────────────────────────────────────────────────────
 loadAllLocal();
