@@ -299,21 +299,32 @@ html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple
       <div class="folder-row">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
         <div class="folder-row-info">
-          <strong>Projects folder</strong>
-          <span id="projects-folder-name">Not connected</span>
+          <strong>Reference files</strong>
+          <span id="projects-folder-name">No files loaded</span>
         </div>
-        <button class="folder-pick-btn" onclick="pickProjectsFolder()">Connect</button>
+        <button class="folder-pick-btn" onclick="pickProjectsFiles()">Add files</button>
       </div>
 
       <div id="projects-file-list" style="display:none">
-        <p style="font-size:11px;color:#888;margin-bottom:6px;">Tap a file to load it as context — agents will read it before responding.</p>
+        <p style="font-size:11px;color:#888;margin-bottom:6px;">Tap a file to include it as context — agents will read it before responding.</p>
         <div class="files-list" id="files-list-inner"></div>
       </div>
 
       <div class="modal-actions" style="margin-top:14px">
         <button class="mbtn primary" onclick="document.getElementById('setup-modal').style.display='none'">Done</button>
       </div>
-      <p class="modal-note">Folder access works best in Chrome or Edge on desktop.<br>On mobile, use the file picker to load files manually.</p>
+      <p class="modal-note">Files are read into memory for this session.<br>Re-add them after a page refresh.</p>
+
+      <div style="margin-top:20px;padding:12px;border:1px solid #fecaca;border-radius:10px;background:#fff5f5">
+        <div style="font-size:11px;font-weight:600;color:#dc2626;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">⚠ Danger zone</div>
+        <p style="font-size:11px;color:#888;margin-bottom:10px">Clearing a conversation removes it from all devices permanently.</p>
+        <select id="clear-select" style="width:100%;padding:7px 10px;border:1px solid #fecaca;border-radius:8px;font-size:12px;font-family:inherit;color:#333;margin-bottom:8px;background:#fff">
+          <option value="">Select a conversation to clear…</option>
+          <option value="gc">Group Chat</option>
+          <option value="secretary">Secretary</option>
+        </select>
+        <button onclick="clearSpecific()" style="width:100%;padding:8px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-size:12px;font-family:inherit;cursor:pointer">Clear selected conversation</button>
+      </div>
     </div>
   </div>
 </div>
@@ -384,10 +395,6 @@ html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple
     <div id="agent-list"></div>
 
     <div class="sidebar-footer">
-      <button class="foot-btn" onclick="clearChat()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
-        Clear conversation
-      </button>
       <button class="foot-btn" onclick="showSetup()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
         Settings & sync
@@ -425,10 +432,17 @@ html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple
         <button class="img-preview-clear" onclick="clearPendingImage()" title="Remove">✕</button>
       </div>
       <div class="input-row">
-        <input type="file" id="file-input" accept="image/*,application/pdf,.docx,.pdf,.txt,.csv" style="display:none" onchange="handleFileSelect(event)">
-        <button class="attach-btn" onclick="document.getElementById('file-input').click()" title="Attach file">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-        </button>
+        <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+        <input type="file" id="ref-file-input" accept=".csv,.xlsx,.xls,.txt,.md,.json" multiple style="display:none" onchange="handleRefFileSelect(event)">
+        <div style="position:relative;flex-shrink:0">
+          <button class="attach-btn" onclick="showAttachMenu(event)" title="Attach">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <div id="attach-menu" style="display:none;position:absolute;bottom:44px;left:0;background:#fff;border:1px solid #e0ddd6;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:50;min-width:190px;overflow:hidden;">
+            <button onclick="document.getElementById('file-input').click();closeAttachMenu()" style="width:100%;padding:11px 16px;background:none;border:none;text-align:left;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:9px;color:#222">📷 Attach image</button>
+            <button onclick="document.getElementById('ref-file-input').click();closeAttachMenu()" style="width:100%;padding:11px 16px;background:none;border:none;text-align:left;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:9px;color:#222;border-top:1px solid #f0ede8">📄 Load reference file</button>
+          </div>
+        </div>
         <textarea id="msg-input" rows="1" placeholder="Message…" onkeydown="handleKey(event)" oninput="autoResize(this)" onpaste="handlePaste(event)"></textarea>
         <button class="send-btn" id="send-btn" onclick="handleSend()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
@@ -1029,7 +1043,7 @@ function nameKey(e,id){ if(e.key==='Enter'){e.preventDefault();e.target.blur();}
 function showSetup() { document.getElementById('setup-modal').style.display='flex'; document.getElementById('api-key-input').value=apiKey; const fb=lsGet('pt_fb'); if(fb) document.getElementById('fb-config-input').value=fb; document.getElementById('pin-input').value=workspacePin; showTab('api'); }
 function showTab(t) {
   ['api','sync','folders'].forEach(p=>{ document.getElementById('panel-'+p).style.display=t===p?'block':'none'; document.getElementById('tab-'+p).classList.toggle('active',t===p); });
-  if(t==='folders') renderFilesList();
+  if(t==='folders'){ renderFilesList(); populateClearSelect(); }
 }
 async function saveSetup(skipSync) {
   const key=document.getElementById('api-key-input').value.trim();
@@ -1047,7 +1061,27 @@ function useStarter(t){ document.getElementById('msg-input').value=t; handleSend
 function handleKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();} }
 function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
 function now(){ return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
-function clearChat(){ if(!active) return; const id=isGC?'gc':active; conversations[id]=[]; saveConvLocal(id); if(db) syncSave(id); renderMessages(); }
+function clearChat(){ /* disabled from sidebar — use Settings > Danger zone */ }
+
+function clearSpecific(){
+  const sel=document.getElementById('clear-select');
+  const id=sel.value; if(!id){ toast('Select a conversation first'); return; }
+  const label=sel.options[sel.selectedIndex].text;
+  const typed=prompt(`Type DELETE to permanently clear "${label}" from all devices:`);
+  if(typed!=='DELETE'){ toast('Cancelled — type DELETE exactly to confirm'); return; }
+  conversations[id]=[]; saveConvLocal(id); if(db) syncSave(id);
+  if(active===id||(isGC&&id==='gc')) renderMessages();
+  sel.value=''; toast(label+' cleared');
+}
+
+function populateClearSelect(){
+  const sel=document.getElementById('clear-select');
+  // Clear existing manager options first
+  while(sel.options.length>3) sel.remove(3);
+  Object.entries(MANAGERS).forEach(([id,m])=>{
+    const opt=document.createElement('option'); opt.value=id; opt.textContent=(m.name||m.title); sel.appendChild(opt);
+  });
+}
 function openSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('open'); }
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('open'); }
 let toastTimer;
@@ -1069,29 +1103,44 @@ async function pickOutputFolder() {
   } catch(e){ if(e.name!=='AbortError') toast('Could not access folder: '+e.message); }
 }
 
-async function pickProjectsFolder() {
-  if(window.showDirectoryPicker) {
-    try {
-      projectsDirHandle=await window.showDirectoryPicker({mode:'read',startIn:'documents'});
-      projectsFiles=[];
-      for await(const [name,handle] of projectsDirHandle.entries()) {
-        if(handle.kind==='file') {
-          const f=await handle.getFile();
-          projectsFiles.push({name,handle,size:f.size});
-        }
-      }
-      projectsFiles.sort((a,b)=>a.name.localeCompare(b.name));
-      document.getElementById('projects-folder-name').textContent=projectsDirHandle.name+' — '+projectsFiles.length+' files';
-      lsSave('pt_proj_folder',projectsDirHandle.name);
-      renderFilesList();
-      toast('Projects folder connected: '+projectsFiles.length+' files');
-    } catch(e){ if(e.name!=='AbortError') toast('Could not access folder'); }
-  } else {
-    // Fallback: multi-file picker
-    const input=document.createElement('input'); input.type='file'; input.multiple=true;
-    input.onchange=async e=>{ const files=Array.from(e.target.files); projectsFiles=files.map(f=>({name:f.name,handle:null,_file:f,size:f.size})); projectsFiles.sort((a,b)=>a.name.localeCompare(b.name)); document.getElementById('projects-folder-name').textContent=files.length+' files loaded'; renderFilesList(); toast(files.length+' files loaded'); };
-    input.click();
-  }
+function showAttachMenu(e){ e.stopPropagation(); const m=document.getElementById('attach-menu'); m.style.display=m.style.display==='none'?'block':'none'; }
+function closeAttachMenu(){ document.getElementById('attach-menu').style.display='none'; }
+document.addEventListener('click',()=>closeAttachMenu());
+
+async function handleRefFileSelect(e) {
+  const files=Array.from(e.target.files); if(!files.length) return;
+  files.forEach(f=>{
+    const exists=projectsFiles.findIndex(p=>p.name===f.name);
+    if(exists>=0) projectsFiles[exists]={name:f.name,handle:null,_file:f,size:f.size};
+    else projectsFiles.push({name:f.name,handle:null,_file:f,size:f.size});
+  });
+  projectsFiles.sort((a,b)=>a.name.localeCompare(b.name));
+  document.getElementById('projects-folder-name').textContent=projectsFiles.length+' file'+(projectsFiles.length!==1?'s':'')+' available';
+  // Auto-load all newly added files
+  for(const f of files) { await toggleFileContext(f.name); }
+  renderFilesList();
+  e.target.value='';
+}
+
+function pickProjectsFiles() {
+  const input=document.createElement('input');
+  input.type='file'; input.multiple=true;
+  input.accept='.csv,.xlsx,.xls,.txt,.md,.json,.pdf,.docx';
+  input.onchange=e=>{
+    const files=Array.from(e.target.files);
+    if(!files.length) return;
+    // Merge with existing files (don't replace)
+    files.forEach(f=>{
+      const exists=projectsFiles.findIndex(p=>p.name===f.name);
+      if(exists>=0) projectsFiles[exists]={name:f.name,handle:null,_file:f,size:f.size};
+      else projectsFiles.push({name:f.name,handle:null,_file:f,size:f.size});
+    });
+    projectsFiles.sort((a,b)=>a.name.localeCompare(b.name));
+    document.getElementById('projects-folder-name').textContent=projectsFiles.length+' file'+(projectsFiles.length!==1?'s':'')+' available';
+    renderFilesList();
+    toast(files.length+' file'+(files.length!==1?'s':'')+' added');
+  };
+  input.click();
 }
 
 function renderFilesList() {
@@ -1128,28 +1177,67 @@ async function readFileForContext(f) {
     return smartTruncate(result, f.name);
   }
 
-  // All other files — read as text
+  // CSV / TSV — aggregate entire file
+  if(ext==='csv'||ext==='tsv'){
+    const text=await fileObj.text();
+    return aggregateCSV(text, f.name);
+  }
+  // All other text files
   const text=await fileObj.text();
   return smartTruncate(text, f.name);
 }
 
+function parseCSVLine(line) {
+  const result=[]; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    if(line[i]==='"'){ inQ=!inQ; }
+    else if(line[i]===','&&!inQ){ result.push(cur.trim()); cur=''; }
+    else { cur+=line[i]; }
+  }
+  result.push(cur.trim()); return result;
+}
+
+function aggregateCSV(text, filename) {
+  const lines=text.split('\n').filter(l=>l.trim());
+  if(lines.length<2) return text;
+  const headers=parseCSVLine(lines[0]);
+  const totalRows=lines.length-1;
+  const colData=headers.map(()=>[]);
+  lines.slice(1).forEach(line=>{ const vals=parseCSVLine(line); headers.forEach((_,i)=>{ if(vals[i]&&vals[i].trim()) colData[i].push(vals[i].trim()); }); });
+
+  let out=`FILE: ${filename}\nTOTAL ROWS: ${totalRows.toLocaleString()}\nCOLUMNS (${headers.length}): ${headers.join(', ')}\n\n=== FULL DATA ANALYSIS ===\n`;
+  headers.forEach((h,i)=>{
+    const vals=colData[i]; if(!vals.length) return;
+    const unique=[...new Set(vals)];
+    const sample=vals.slice(0,50);
+    const isNum=sample.filter(v=>v).every(v=>!isNaN(parseFloat(v.replace(/[,$%]/g,''))));
+    if(isNum&&unique.length>10){
+      const nums=vals.map(v=>parseFloat(v.replace(/[,$%]/g,''))).filter(n=>!isNaN(n));
+      const sum=nums.reduce((a,b)=>a+b,0);
+      out+=`\n${h}: sum=${sum.toLocaleString(undefined,{maximumFractionDigits:2})}, avg=${(sum/nums.length).toFixed(2)}, min=${Math.min(...nums)}, max=${Math.max(...nums)}, count=${nums.length}`;
+    } else if(unique.length<=50){
+      const counts={}; vals.forEach(v=>counts[v]=(counts[v]||0)+1);
+      const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+      out+=`\n${h}: `+sorted.map(([v,c])=>`${v}(${c})`).join(', ');
+      if(sorted.length>50) out+=` ... +${sorted.length-50} more values`;
+    } else {
+      out+=`\n${h}: ${unique.length.toLocaleString()} unique values (e.g. ${unique.slice(0,3).join(', ')}...)`;
+    }
+  });
+  out+=`\n\n=== SAMPLE (first 20 rows) ===\n${lines[0]}\n${lines.slice(1,21).join('\n')}`;
+  return out;
+}
+
 function smartTruncate(text, filename) {
-  const MAX=14000; // ~3500 tokens — safe for most prompts
+  const MAX=14000;
   if(text.length<=MAX) return text;
   const ext=filename.split('.').pop().toLowerCase();
-  const lines=text.split('\n');
-  const totalRows=lines.length;
-
-  // For tabular data keep header + first 300 rows
-  if(['csv','xlsx','xls','tsv'].includes(ext)) {
-    const kept=lines.slice(0,301).join('\n');
-    const preview=kept.length>MAX ? kept.slice(0,MAX) : kept;
-    return preview+`\n\n[File truncated: showing first 300 of ${totalRows} rows. Full file: ${(text.length/1024).toFixed(0)}KB]`;
+  if(['csv','xlsx','xls','tsv'].includes(ext)){
+    // Return full aggregation — no truncation needed, it's already compact
+    return text; // aggregateCSV already produces compact output
   }
-  // Text files — keep start + end
   const half=Math.floor(MAX/2);
-  return text.slice(0,half)+'\n\n[...middle of file omitted...]\n\n'+text.slice(-half)+
-    `\n\n[File truncated: ${(text.length/1024).toFixed(0)}KB total]`;
+  return text.slice(0,half)+'\n\n[...middle omitted...]\n\n'+text.slice(-half)+`\n\n[Truncated: ${(text.length/1024).toFixed(0)}KB total]`;
 }
 
 async function toggleFileContext(name) {
@@ -1182,28 +1270,46 @@ function buildContextPrompt() {
   return '\n\n---\nREFERENCE FILES (read before responding):\n'+loadedFiles.map(f=>`\n### ${f.name}\n${f.content}`).join('\n')+'\n---';
 }
 
-async function saveOutput(content, agentName, agentTitle) {
-  const date=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-  const slug=(agentName||agentTitle).replace(/[^a-zA-Z0-9]/g,'_');
-  const filename=`${slug}_${date}.md`;
-  const header=`# ${agentName||agentTitle}\n_${agentTitle} · ${new Date().toLocaleString()}_\n\n---\n\n`;
-  const full=header+content;
+function contentToHtmlBody(content) {
+  return content.split('\n').map(line=>{
+    if(line.startsWith('### ')) return `<h3>${line.slice(4)}</h3>`;
+    if(line.startsWith('## '))  return `<h2>${line.slice(3)}</h2>`;
+    if(line.startsWith('# '))   return `<h1>${line.slice(2)}</h1>`;
+    if(line.startsWith('- ')||line.startsWith('• ')) return `<li>${line.slice(2)}</li>`;
+    if(line.trim()==='---') return `<hr>`;
+    if(line.trim()==='') return `<p>&nbsp;</p>`;
+    // Bold **text**
+    return `<p>${line.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')}</p>`;
+  }).join('\n');
+}
 
-  if(outputDirHandle) {
-    try {
-      const fh=await outputDirHandle.getFileHandle(filename,{create:true});
-      const w=await fh.createWritable();
-      await w.write(full); await w.close();
-      toast('Saved to '+outputDirHandle.name+' ✓');
-      return;
-    } catch(e){ console.warn('Folder save failed, falling back to download',e); }
-  }
-  // Fallback: download
-  const blob=new Blob([full],{type:'text/markdown'});
+async function saveOutput(content, agentName, agentTitle) {
+  const dateStr=new Date().toISOString().slice(0,10);
+  const slug=(agentName||agentTitle).replace(/[^a-zA-Z0-9]/g,'_');
+  const filename=`${slug}_${dateStr}.doc`;
+  const htmlDoc=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='UTF-8'>
+<style>
+  body{font-family:Calibri,sans-serif;font-size:11pt;margin:1in;color:#111;line-height:1.5}
+  h1{font-size:18pt;color:#1a1a1a;margin-bottom:4pt}
+  h2{font-size:14pt;color:#333;margin-top:14pt}
+  h3{font-size:12pt;color:#555}
+  .meta{color:#888;font-size:9pt;margin-bottom:18pt;padding-bottom:8pt;border-bottom:1px solid #ddd}
+  li{margin-left:20pt;margin-bottom:3pt}
+  p{margin:0 0 6pt}
+  hr{border:none;border-top:1px solid #ddd;margin:12pt 0}
+</style></head>
+<body>
+<h1>${agentName||agentTitle}</h1>
+<div class="meta">${agentTitle}&nbsp;&nbsp;·&nbsp;&nbsp;${new Date().toLocaleString()}</div>
+${contentToHtmlBody(content)}
+</body></html>`;
+
+  const blob=new Blob(['﻿'+htmlDoc],{type:'application/msword'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
   URL.revokeObjectURL(url);
-  toast('Downloaded: '+filename);
+  toast('Downloaded as Word doc: '+filename);
 }
 
 function makeSaveBtn(content, agentName, agentTitle) {
