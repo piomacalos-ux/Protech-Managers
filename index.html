@@ -9,12 +9,14 @@
 <style>
 :root { --sidebar-w: 244px; color-scheme: light; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f4f1; }
-.app { display: flex; height: 100vh; position: relative; overflow: hidden; }
+html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f4f1; }
+.app { display: flex; height: 100vh; height: 100dvh; position: relative; overflow: hidden; }
 
 /* ── SIDEBAR ── */
 .sidebar { width: var(--sidebar-w); min-width: var(--sidebar-w); background: #fff; border-right: 1px solid #e8e5df; display: flex; flex-direction: column; padding: 16px 10px 12px; gap: 1px; overflow-y: auto; z-index: 20; transition: transform 0.25s ease; }
 .sidebar-logo { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #111; padding: 0 8px; margin-bottom: 10px; }
+.sidebar-close { display: none; background: none; border: none; color: #aaa; font-size: 22px; cursor: pointer; padding: 2px 6px; border-radius: 8px; line-height: 1; margin-left: auto; flex-shrink: 0; }
+.sidebar-close:hover { background: #f0ede8; color: #666; }
 .sidebar-logo span { font-size: 11px; font-weight: 400; color: #bbb; }
 .sync-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; padding: 2px 7px; border-radius: 20px; margin-left: auto; font-weight: 500; }
 .sync-badge.on { background: #dcfce7; color: #166534; }
@@ -110,7 +112,16 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
 
 /* Input */
-.input-bar { background: #fff; border-top: 1px solid #e8e5df; padding: 10px 12px; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+.input-bar { background: #fff; border-top: 1px solid #e8e5df; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom, 10px)); }
+.input-row { display: flex; gap: 8px; align-items: flex-end; }
+.attach-btn { width: 36px; height: 36px; background: #f5f4f1; border: 1px solid #e0ddd6; border-radius: 10px; cursor: pointer; color: #888; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.1s; }
+.attach-btn:hover { background: #edeae4; color: #444; }
+.img-preview-wrap { display: flex; align-items: center; gap: 8px; background: #f9f8f5; border-radius: 10px; padding: 6px 10px; }
+.img-preview-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid #e0ddd6; }
+.img-preview-name { font-size: 12px; color: #555; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.img-preview-clear { background: none; border: none; color: #bbb; font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1; }
+.img-preview-clear:hover { color: #666; }
+.msg-img { max-width: 220px; border-radius: 12px; display: block; margin-bottom: 4px; border: 1px solid #e5e2dc; }
 .input-bar textarea { flex: 1; resize: none; border: 1px solid #e0ddd6; border-radius: 14px; padding: 10px 14px; font-size: 14px; font-family: inherit; outline: none; line-height: 1.5; min-height: 42px; max-height: 120px; overflow-y: auto; background: #fafaf8; color: #111; transition: border-color 0.15s; -webkit-appearance: none; }
 .input-bar textarea:focus { border-color: #aaa; background: #fff; }
 .input-bar textarea::placeholder { color: #ccc; }
@@ -180,6 +191,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   .sidebar.open { transform: translateX(0); }
   .sidebar-overlay.open { display: block; }
   .hamburger { display: flex; align-items: center; justify-content: center; background: #f0ede8; border-radius: 10px; margin-right: 2px; }
+  .sidebar-close { display: flex; align-items: center; justify-content: center; }
   .chat-header { padding: 0 12px; }
   .messages-area { padding: 14px 12px; }
   .msg { max-width: 90%; }
@@ -266,6 +278,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">ProTech <span>Operations</span>
       <span class="sync-badge off" id="sync-badge"><span class="sync-dot"></span> offline</span>
+      <button class="sidebar-close" onclick="closeSidebar()" title="Close">✕</button>
     </div>
 
     <!-- Group Chat -->
@@ -335,10 +348,21 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
     </div>
     <div id="messages-area" class="messages-area" style="display:none"></div>
     <div class="input-bar" id="input-bar" style="display:none">
-      <textarea id="msg-input" rows="1" placeholder="Message…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-      <button class="send-btn" id="send-btn" onclick="handleSend()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-      </button>
+      <div id="img-preview-wrap" class="img-preview-wrap" style="display:none">
+        <img id="img-preview-thumb" class="img-preview-thumb" src="" alt="preview">
+        <span class="img-preview-name" id="img-preview-name">Image</span>
+        <button class="img-preview-clear" onclick="clearPendingImage()" title="Remove">✕</button>
+      </div>
+      <div class="input-row">
+        <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+        <button class="attach-btn" onclick="document.getElementById('file-input').click()" title="Attach image">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <textarea id="msg-input" rows="1" placeholder="Message…" onkeydown="handleKey(event)" oninput="autoResize(this)" onpaste="handlePaste(event)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="handleSend()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </button>
+      </div>
     </div>
     <div id="gc-note-bar" style="display:none" class="input-bar" style="padding-top:0">
       <p class="gc-note" style="width:100%">All 8 managers will respond — this uses more API credits than individual chats.</p>
@@ -398,6 +422,7 @@ let active=null, isGC=false, isLoading=false;
 const conversations={};
 let secretaryNotes={ notes:[], actions:[], reminders:[] };
 let activeNotesTab='notes';
+let pendingImage=null; // { data: base64string, type: 'image/jpeg', name: 'filename' }
 
 // ── LOCAL STORAGE ─────────────────────────────────────────────
 const lsSave=(k,v)=>{ try{ localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v)); }catch(e){} };
@@ -555,7 +580,9 @@ function renderMessages() {
   const area=document.getElementById('messages-area');
   area.style.display='flex'; area.innerHTML='';
   if(isGC) { renderGCMessages(area); return; }
+  if(!active) return;
   const m=(active==='secretary')?SECRETARY:MANAGERS[active];
+  if(!m) return;
   if(!conversations[active]||!conversations[active].length) {
     const w=document.createElement('div'); w.className='welcome';
     w.innerHTML=`<div class="welcome-avatar">${avatarSVG(m,64)}</div>
@@ -565,7 +592,7 @@ function renderMessages() {
       <div class="starters">${m.starters.map(s=>`<button class="starter" onclick="useStarter('${s.replace(/'/g,"\\'")}')"> ${s}</button>`).join('')}</div>`;
     area.appendChild(w); return;
   }
-  conversations[active].forEach(msg=>appendBubble(area, msg.role, msg.content, msg.time, active));
+  conversations[active].forEach(msg=>appendBubble(area, msg.role, msg.content, msg.time, active, msg.img));
   area.scrollTop=area.scrollHeight;
 }
 
@@ -595,7 +622,7 @@ function appendGCResponse(container, msg) {
 }
 
 // ── APPEND BUBBLE ─────────────────────────────────────────────
-function appendBubble(container, role, content, time, agentId) {
+function appendBubble(container, role, content, time, agentId, imgData) {
   const m=agentId==='secretary'?SECRETARY:(MANAGERS[agentId]||MANAGERS[active]||SECRETARY);
   const div=document.createElement('div');
   div.className=`msg ${role==='user'?'user':'bot'}`;
@@ -608,7 +635,9 @@ function appendBubble(container, role, content, time, agentId) {
     row.appendChild(mini); row.appendChild(wrap); div.appendChild(row);
   } else {
     const wrap=document.createElement('div'); wrap.className='bubble-wrap';
-    const bub=document.createElement('div'); bub.className='bubble'; bub.textContent=content;
+    const bub=document.createElement('div'); bub.className='bubble';
+    if(imgData) { const im=document.createElement('img'); im.className='msg-img'; im.src=`data:${imgData.type};base64,${imgData.data}`; bub.appendChild(im); }
+    if(content&&content!=='[Image]') { const t=document.createTextNode(content); bub.appendChild(t); }
     const cb=makeCopyBtn(content); wrap.appendChild(bub); wrap.appendChild(cb);
     div.appendChild(wrap);
   }
@@ -624,12 +653,57 @@ function makeCopyBtn(text) {
   return btn;
 }
 
+// ── IMAGE HANDLING ────────────────────────────────────────────
+function handleFileSelect(e) {
+  const file=e.target.files?.[0]; if(!file||!file.type.startsWith('image/')) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{ setPendingImage(ev.target.result.split(',')[1], file.type, file.name); };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+function handlePaste(e) {
+  const items=e.clipboardData?.items; if(!items) return;
+  for(const item of items) {
+    if(item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file=item.getAsFile(); if(!file) return;
+      const reader=new FileReader();
+      reader.onload=ev=>{ setPendingImage(ev.target.result.split(',')[1], file.type, 'Pasted image'); };
+      reader.readAsDataURL(file);
+      return;
+    }
+  }
+}
+
+function setPendingImage(base64, type, name) {
+  pendingImage={data:base64, type, name};
+  const wrap=document.getElementById('img-preview-wrap');
+  const thumb=document.getElementById('img-preview-thumb');
+  const label=document.getElementById('img-preview-name');
+  thumb.src=`data:${type};base64,${base64}`;
+  label.textContent=name||'Image';
+  wrap.style.display='flex';
+}
+
+function clearPendingImage() {
+  pendingImage=null;
+  document.getElementById('img-preview-wrap').style.display='none';
+  document.getElementById('img-preview-thumb').src='';
+}
+
 // ── CALL CLAUDE ───────────────────────────────────────────────
-async function callClaude(prompt) {
+async function callClaude(prompt, img=null) {
+  let content;
+  if(img) {
+    content=[{type:'image',source:{type:'base64',media_type:img.type,data:img.data}},{type:'text',text:prompt}];
+  } else {
+    content=prompt;
+  }
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:selectedModel,max_tokens:1024,messages:[{role:'user',content:prompt}]})
+    body:JSON.stringify({model:selectedModel,max_tokens:1024,messages:[{role:'user',content}]})
   });
   if(!res.ok){ const e=await res.json().catch(()=>{}); throw new Error(e?.error?.message||`HTTP ${res.status}`); }
   const data=await res.json();
@@ -643,16 +717,19 @@ async function sendMessage() {
   if(!active||isLoading) return;
   if(!apiKey){ showSetup(); return; }
   const input=document.getElementById('msg-input');
-  const text=input.value.trim(); if(!text) return;
+  const text=input.value.trim();
+  const img=pendingImage;
+  if(!text&&!img) return;
   input.value=''; input.style.height='auto';
+  clearPendingImage();
   isLoading=true; document.getElementById('send-btn').disabled=true;
 
   if(!conversations[active]) conversations[active]=[];
-  const t=now(); conversations[active].push({role:'user',content:text,time:t});
+  const t=now(); conversations[active].push({role:'user',content:text||(img?'[Image]':''),time:t,img:img?{data:img.data,type:img.type}:null});
 
   const area=document.getElementById('messages-area');
   area.innerHTML='';
-  conversations[active].forEach(msg=>appendBubble(area,msg.role,msg.content,msg.time,active));
+  conversations[active].forEach(msg=>appendBubble(area,msg.role,msg.content,msg.time,active,msg.img));
 
   const m=(active==='secretary')?SECRETARY:MANAGERS[active];
   const loadEl=document.createElement('div'); loadEl.className='msg bot loading';
@@ -672,7 +749,7 @@ async function sendMessage() {
   const prompt=`${promptText}\n\nYour team: ${roster}\n\n---\nConversation:\n${history}\n\nRespond as ${m.name||m.title}.`;
 
   try {
-    const reply=await callClaude(prompt);
+    const reply=await callClaude(prompt, img);
     area.removeChild(loadEl);
     const rt=now(); conversations[active].push({role:'bot',content:reply,time:rt});
     appendBubble(area,'bot',reply,rt,active);
