@@ -94,13 +94,39 @@ html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple
 .msg.bot.loading .bubble { color: #bbb; }
 .msg-meta { font-size: 10px; color: #ccc; margin-top: 3px; padding: 0 2px; }
 
-/* Copy button */
-.copy-btn { position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.9); border: 1px solid #e0ddd6; border-radius: 6px; padding: 3px 6px; font-size: 10px; cursor: pointer; color: #888; opacity: 0; transition: opacity 0.15s; line-height: 1; font-family: inherit; }
-.msg.user .copy-btn { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); }
-.bubble-wrap:hover .copy-btn { opacity: 1; }
+/* Copy + Save buttons */
+.copy-btn, .save-btn { position: absolute; background: rgba(255,255,255,0.9); border: 1px solid #e0ddd6; border-radius: 6px; padding: 3px 6px; font-size: 10px; cursor: pointer; color: #888; opacity: 0; transition: opacity 0.15s; line-height: 1; font-family: inherit; }
+.copy-btn { top: 6px; right: 6px; }
+.save-btn { top: 6px; right: 50px; }
+.msg.user .copy-btn, .msg.user .save-btn { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); }
+.bubble-wrap:hover .copy-btn, .bubble-wrap:hover .save-btn { opacity: 1; }
 .copy-btn:hover { background: #f0ede8; color: #444; }
-.msg.user .copy-btn:hover { background: rgba(255,255,255,0.25); }
-@media (max-width: 640px) { .copy-btn { opacity: 0.7; } }
+.save-btn:hover { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.msg.user .copy-btn:hover, .msg.user .save-btn:hover { background: rgba(255,255,255,0.25); }
+@media (max-width: 640px) { .copy-btn, .save-btn { opacity: 0.7; } }
+
+/* Context files bar */
+.ctx-bar { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 12px 0; background: #fff; }
+.ctx-chip { display: inline-flex; align-items: center; gap: 5px; background: #eef6ff; border: 1px solid #bfdbfe; border-radius: 20px; padding: 3px 9px 3px 8px; font-size: 11px; color: #1d4ed8; cursor: default; }
+.ctx-chip-remove { background: none; border: none; color: #93c5fd; font-size: 14px; cursor: pointer; padding: 0; line-height: 1; }
+.ctx-chip-remove:hover { color: #1d4ed8; }
+
+/* Folder settings */
+.folder-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #f9f8f5; border-radius: 10px; margin-bottom: 10px; }
+.folder-row-info { flex: 1; min-width: 0; }
+.folder-row-info strong { font-size: 12px; color: #111; display: block; }
+.folder-row-info span { font-size: 11px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.folder-pick-btn { background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 6px 11px; font-size: 11px; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
+.folder-pick-btn.secondary { background: #f0ede8; color: #555; }
+.files-list { max-height: 160px; overflow-y: auto; border: 1px solid #e8e5df; border-radius: 8px; }
+.file-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #f5f4f1; cursor: pointer; transition: background 0.1s; }
+.file-item:last-child { border-bottom: none; }
+.file-item:hover { background: #f5f4f1; }
+.file-item.loaded { background: #eef6ff; }
+.file-item-name { font-size: 12px; color: #333; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-item-size { font-size: 10px; color: #ccc; }
+.file-item-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid #ddd; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+.file-item.loaded .file-item-check { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
 
 /* GC manager label */
 .gc-label { font-size: 11px; font-weight: 600; color: #666; margin-bottom: 3px; padding-left: 30px; }
@@ -215,6 +241,7 @@ html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple
     <div class="step-tabs">
       <button class="step-tab active" id="tab-api" onclick="showTab('api')">① API Key</button>
       <button class="step-tab" id="tab-sync" onclick="showTab('sync')">② Sync</button>
+      <button class="step-tab" id="tab-folders" onclick="showTab('folders')">③ Folders</button>
     </div>
     <div id="panel-api">
       <h2>Connect Claude API</h2>
@@ -253,6 +280,39 @@ html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple
         <button class="mbtn secondary" onclick="saveSetup(true)">Skip sync</button>
         <button class="mbtn primary" onclick="saveSetup(false)">Connect & start</button>
       </div>
+    </div>
+
+    <div id="panel-folders" style="display:none">
+      <h2>Folders</h2>
+      <p class="sub">Connect folders so agents can read your project files and save their outputs.</p>
+
+      <div class="folder-row">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <div class="folder-row-info">
+          <strong>Output folder</strong>
+          <span id="output-folder-name">Not set — Save buttons will download files</span>
+        </div>
+        <button class="folder-pick-btn" onclick="pickOutputFolder()">Pick folder</button>
+      </div>
+
+      <div class="folder-row">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <div class="folder-row-info">
+          <strong>Projects folder</strong>
+          <span id="projects-folder-name">Not connected</span>
+        </div>
+        <button class="folder-pick-btn" onclick="pickProjectsFolder()">Connect</button>
+      </div>
+
+      <div id="projects-file-list" style="display:none">
+        <p style="font-size:11px;color:#888;margin-bottom:6px;">Tap a file to load it as context — agents will read it before responding.</p>
+        <div class="files-list" id="files-list-inner"></div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:14px">
+        <button class="mbtn primary" onclick="document.getElementById('setup-modal').style.display='none'">Done</button>
+      </div>
+      <p class="modal-note">Folder access works best in Chrome or Edge on desktop.<br>On mobile, use the file picker to load files manually.</p>
     </div>
   </div>
 </div>
@@ -352,6 +412,7 @@ html, body { height: 100%; height: 100dvh; overflow: hidden; font-family: -apple
       <span>Select a channel or manager</span>
     </div>
     <div id="messages-area" class="messages-area" style="display:none"></div>
+    <div id="ctx-bar" class="ctx-bar" style="display:none"></div>
     <div class="input-bar" id="input-bar" style="display:none">
       <div id="img-preview-wrap" class="img-preview-wrap" style="display:none">
         <img id="img-preview-thumb" class="img-preview-thumb" src="" alt="preview" style="display:none">
@@ -557,6 +618,7 @@ function selectGC() {
   document.getElementById('input-bar').style.display='flex';
   document.getElementById('gc-note-bar').style.display='block';
   document.getElementById('msg-input').placeholder='Message all managers…';
+  renderCtxBar();
   if(!conversations['gc']) conversations['gc']=[];
   attachSyncListener('gc');
   renderMessages();
@@ -577,6 +639,7 @@ function selectManager(id) {
   document.getElementById('input-bar').style.display='flex';
   document.getElementById('gc-note-bar').style.display='none';
   document.getElementById('msg-input').placeholder=id==='secretary'?'Ask your Secretary…':'Message your manager…';
+  renderCtxBar();
   if(!conversations[id]) conversations[id]=[];
   attachSyncListener(id);
   if(id==='secretary') attachSecNotesListener();
@@ -640,7 +703,9 @@ function appendBubble(container, role, content, time, agentId, imgData, fileAtta
     const mini=document.createElement('div'); mini.className='mini-avatar'; mini.innerHTML=avatarSVG(m,22);
     const wrap=document.createElement('div'); wrap.className='bubble-wrap';
     const bub=document.createElement('div'); bub.className='bubble'; bub.textContent=content;
-    const cb=makeCopyBtn(content); wrap.appendChild(bub); wrap.appendChild(cb);
+    const cb=makeCopyBtn(content);
+    const sb=makeSaveBtn(content, m.name, m.title);
+    wrap.appendChild(bub); wrap.appendChild(sb); wrap.appendChild(cb);
     row.appendChild(mini); row.appendChild(wrap); div.appendChild(row);
   } else {
     const wrap=document.createElement('div'); wrap.className='bubble-wrap';
@@ -794,7 +859,8 @@ async function sendMessage() {
   if(m.name) promptText=`Your name is ${m.name}.\n`+promptText;
   // Build team roster so this manager knows the full team by name
   const roster=Object.entries(MANAGERS).map(([id,mg])=>`${mg.name||mg.title} (${mg.title})`).join(', ')+(SECRETARY.name?`, ${SECRETARY.name} (Secretary)`:'');
-  const prompt=`${promptText}\n\nYour team: ${roster}\n\n---\nConversation:\n${history}\n\nRespond as ${m.name||m.title}.`;
+  const fileCtx=buildContextPrompt();
+  const prompt=`${promptText}\n\nYour team: ${roster}${fileCtx}\n\n---\nConversation:\n${history}\n\nRespond as ${m.name||m.title}.`;
 
   try {
     const reply=await callClaude(prompt, img);
@@ -856,7 +922,8 @@ async function sendGroupMessage() {
         .replace('{REMINDERS}', secretaryNotes.reminders.map(r=>r.date+': '+r.text).join('\n')||'None yet');
     }
     if(m.name) sysPrompt=`Your name is ${m.name}.\n`+sysPrompt;
-    const prompt=`${sysPrompt}\n\nTeam: ${teamRoster}\n\n---\nGroup discussion context:\n${gcHistory}\n\nRespond specifically from your role (${m.title}) perspective. Be concise — 2-4 sentences max in a group setting.`;
+    const fileCtxGC=buildContextPrompt();
+    const prompt=`${sysPrompt}\n\nTeam: ${teamRoster}${fileCtxGC}\n\n---\nGroup discussion context:\n${gcHistory}\n\nRespond specifically from your role (${m.title}) perspective. Be concise — 2-4 sentences max in a group setting.`;
     try {
       const reply=await callClaude(prompt);
       const label=document.getElementById('gc-label-'+id);
@@ -952,7 +1019,10 @@ function nameKey(e,id){ if(e.key==='Enter'){e.preventDefault();e.target.blur();}
 
 // ── SETUP ─────────────────────────────────────────────────────
 function showSetup() { document.getElementById('setup-modal').style.display='flex'; document.getElementById('api-key-input').value=apiKey; const fb=lsGet('pt_fb'); if(fb) document.getElementById('fb-config-input').value=fb; document.getElementById('pin-input').value=workspacePin; showTab('api'); }
-function showTab(t) { document.getElementById('panel-api').style.display=t==='api'?'block':'none'; document.getElementById('panel-sync').style.display=t==='sync'?'block':'none'; document.getElementById('tab-api').classList.toggle('active',t==='api'); document.getElementById('tab-sync').classList.toggle('active',t==='sync'); }
+function showTab(t) {
+  ['api','sync','folders'].forEach(p=>{ document.getElementById('panel-'+p).style.display=t===p?'block':'none'; document.getElementById('tab-'+p).classList.toggle('active',t===p); });
+  if(t==='folders') renderFilesList();
+}
 async function saveSetup(skipSync) {
   const key=document.getElementById('api-key-input').value.trim();
   if(!key.startsWith('sk-')){ alert('Enter a valid Anthropic API key (starts with sk-).'); showTab('api'); return; }
@@ -974,6 +1044,127 @@ function openSidebar(){ document.getElementById('sidebar').classList.add('open')
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('open'); }
 let toastTimer;
 function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2800); }
+
+// ── FOLDERS & FILE CONTEXT ───────────────────────────────────
+let outputDirHandle=null;
+let projectsDirHandle=null;
+let projectsFiles=[]; // [{name, handle, size}]
+let loadedFiles=[];   // [{name, content}] — currently loaded as context
+
+async function pickOutputFolder() {
+  if(!window.showDirectoryPicker){ toast('Use Chrome/Edge desktop for folder access'); return; }
+  try {
+    outputDirHandle=await window.showDirectoryPicker({mode:'readwrite',startIn:'documents'});
+    document.getElementById('output-folder-name').textContent=outputDirHandle.name+' (connected)';
+    lsSave('pt_out_folder',outputDirHandle.name);
+    toast('Output folder connected: '+outputDirHandle.name);
+  } catch(e){ if(e.name!=='AbortError') toast('Could not access folder: '+e.message); }
+}
+
+async function pickProjectsFolder() {
+  if(window.showDirectoryPicker) {
+    try {
+      projectsDirHandle=await window.showDirectoryPicker({mode:'read',startIn:'documents'});
+      projectsFiles=[];
+      for await(const [name,handle] of projectsDirHandle.entries()) {
+        if(handle.kind==='file') {
+          const f=await handle.getFile();
+          projectsFiles.push({name,handle,size:f.size});
+        }
+      }
+      projectsFiles.sort((a,b)=>a.name.localeCompare(b.name));
+      document.getElementById('projects-folder-name').textContent=projectsDirHandle.name+' — '+projectsFiles.length+' files';
+      lsSave('pt_proj_folder',projectsDirHandle.name);
+      renderFilesList();
+      toast('Projects folder connected: '+projectsFiles.length+' files');
+    } catch(e){ if(e.name!=='AbortError') toast('Could not access folder'); }
+  } else {
+    // Fallback: multi-file picker
+    const input=document.createElement('input'); input.type='file'; input.multiple=true;
+    input.onchange=async e=>{ const files=Array.from(e.target.files); projectsFiles=files.map(f=>({name:f.name,handle:null,_file:f,size:f.size})); projectsFiles.sort((a,b)=>a.name.localeCompare(b.name)); document.getElementById('projects-folder-name').textContent=files.length+' files loaded'; renderFilesList(); toast(files.length+' files loaded'); };
+    input.click();
+  }
+}
+
+function renderFilesList() {
+  const inner=document.getElementById('files-list-inner');
+  const wrap=document.getElementById('projects-file-list');
+  if(!projectsFiles.length){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  inner.innerHTML=projectsFiles.map(f=>{
+    const isLoaded=loadedFiles.some(l=>l.name===f.name);
+    const kb=f.size>0?Math.ceil(f.size/1024)+'KB':'';
+    return `<div class="file-item${isLoaded?' loaded':''}" onclick="toggleFileContext('${f.name.replace(/'/g,"\\'")}')">
+      <div class="file-item-check">${isLoaded?'✓':''}</div>
+      <div class="file-item-name">${f.name}</div>
+      <div class="file-item-size">${kb}</div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleFileContext(name) {
+  const already=loadedFiles.findIndex(l=>l.name===name);
+  if(already>=0){ loadedFiles.splice(already,1); renderCtxBar(); renderFilesList(); return; }
+  const f=projectsFiles.find(x=>x.name===name); if(!f) return;
+  try {
+    let text='';
+    if(f.handle) { const file=await f.handle.getFile(); text=await file.text(); }
+    else if(f._file) { text=await f._file.text(); }
+    else { toast('Cannot read file'); return; }
+    // Truncate to ~8000 chars to stay within token limits
+    if(text.length>8000) { text=text.slice(0,8000)+'\n\n[...file truncated...]'; }
+    loadedFiles.push({name,content:text});
+    toast('Loaded: '+name);
+  } catch(e){ toast('Could not read file: '+e.message); return; }
+  renderCtxBar(); renderFilesList();
+}
+
+function renderCtxBar() {
+  const bar=document.getElementById('ctx-bar');
+  if(!loadedFiles.length){ bar.style.display='none'; return; }
+  bar.style.display='flex';
+  bar.innerHTML=loadedFiles.map(f=>`
+    <div class="ctx-chip">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      ${f.name}
+      <button class="ctx-chip-remove" onclick="toggleFileContext('${f.name.replace(/'/g,"\\'")}')">✕</button>
+    </div>`).join('');
+}
+
+function buildContextPrompt() {
+  if(!loadedFiles.length) return '';
+  return '\n\n---\nREFERENCE FILES (read before responding):\n'+loadedFiles.map(f=>`\n### ${f.name}\n${f.content}`).join('\n')+'\n---';
+}
+
+async function saveOutput(content, agentName, agentTitle) {
+  const date=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
+  const slug=(agentName||agentTitle).replace(/[^a-zA-Z0-9]/g,'_');
+  const filename=`${slug}_${date}.md`;
+  const header=`# ${agentName||agentTitle}\n_${agentTitle} · ${new Date().toLocaleString()}_\n\n---\n\n`;
+  const full=header+content;
+
+  if(outputDirHandle) {
+    try {
+      const fh=await outputDirHandle.getFileHandle(filename,{create:true});
+      const w=await fh.createWritable();
+      await w.write(full); await w.close();
+      toast('Saved to '+outputDirHandle.name+' ✓');
+      return;
+    } catch(e){ console.warn('Folder save failed, falling back to download',e); }
+  }
+  // Fallback: download
+  const blob=new Blob([full],{type:'text/markdown'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+  toast('Downloaded: '+filename);
+}
+
+function makeSaveBtn(content, agentName, agentTitle) {
+  const btn=document.createElement('button'); btn.className='save-btn'; btn.textContent='Save';
+  btn.onclick=()=>saveOutput(content, agentName, agentTitle);
+  return btn;
+}
 
 // ── SWIPE TO OPEN SIDEBAR (mobile) ───────────────────────────
 (function(){
