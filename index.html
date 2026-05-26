@@ -540,7 +540,14 @@ function attachSyncListener(id) {
   if(!db||!workspacePin) return;
   if(syncListeners[id]){ syncListeners[id](); delete syncListeners[id]; }
   syncListeners[id]=convPath(id).onSnapshot(snap=>{
-    if(snap.exists){ const d=snap.data(); if(d&&d.messages){ conversations[id]=d.messages; saveConvLocal(id); if(active===id||(isGC&&id==='gc')) renderMessages(); }}
+    if(snap.exists){ const d=snap.data(); if(d&&d.messages){
+      // Don't overwrite local conversation while a message is being sent/received
+      // This prevents the sync echo from wiping out messages mid-conversation
+      if(!isLoading){
+        conversations[id]=d.messages; saveConvLocal(id);
+        if(active===id||(isGC&&id==='gc')) renderMessages();
+      }
+    }}
   }, err=>console.warn('Sync error:',err));
 }
 
