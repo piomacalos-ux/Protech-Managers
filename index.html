@@ -701,7 +701,7 @@ function handlePaste(e) {
       e.preventDefault();
       const file=item.getAsFile(); if(!file) return;
       const reader=new FileReader();
-      reader.onload=ev=>{ setPendingImage(ev.target.result.split(',')[1], file.type, 'Pasted image'); };
+      reader.onload=ev=>{ setPendingImage({kind:'image',data:ev.target.result.split(',')[1],type:file.type,name:'Pasted image'}); };
       reader.readAsDataURL(file);
       return;
     }
