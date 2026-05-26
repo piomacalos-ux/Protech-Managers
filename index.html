@@ -6,6 +6,7 @@
 <title>ProTech Ops Managers</title>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
 :root { --sidebar-w: 244px; color-scheme: light; }
@@ -1109,19 +1110,57 @@ function renderFilesList() {
   }).join('');
 }
 
+async function readFileForContext(f) {
+  const ext=f.name.split('.').pop().toLowerCase();
+  const fileObj=f.handle ? await f.handle.getFile() : f._file;
+  if(!fileObj) throw new Error('Cannot access file');
+
+  // Excel files — convert to CSV text via SheetJS
+  if(ext==='xlsx'||ext==='xls') {
+    if(!window.XLSX) throw new Error('Excel library not loaded yet, try again in a moment');
+    const buf=await fileObj.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    let result='';
+    wb.SheetNames.forEach(sn=>{
+      const csv=XLSX.utils.sheet_to_csv(wb.Sheets[sn]);
+      result+=`=== Sheet: ${sn} ===\n${csv}\n\n`;
+    });
+    return smartTruncate(result, f.name);
+  }
+
+  // All other files — read as text
+  const text=await fileObj.text();
+  return smartTruncate(text, f.name);
+}
+
+function smartTruncate(text, filename) {
+  const MAX=14000; // ~3500 tokens — safe for most prompts
+  if(text.length<=MAX) return text;
+  const ext=filename.split('.').pop().toLowerCase();
+  const lines=text.split('\n');
+  const totalRows=lines.length;
+
+  // For tabular data keep header + first 300 rows
+  if(['csv','xlsx','xls','tsv'].includes(ext)) {
+    const kept=lines.slice(0,301).join('\n');
+    const preview=kept.length>MAX ? kept.slice(0,MAX) : kept;
+    return preview+`\n\n[File truncated: showing first 300 of ${totalRows} rows. Full file: ${(text.length/1024).toFixed(0)}KB]`;
+  }
+  // Text files — keep start + end
+  const half=Math.floor(MAX/2);
+  return text.slice(0,half)+'\n\n[...middle of file omitted...]\n\n'+text.slice(-half)+
+    `\n\n[File truncated: ${(text.length/1024).toFixed(0)}KB total]`;
+}
+
 async function toggleFileContext(name) {
   const already=loadedFiles.findIndex(l=>l.name===name);
   if(already>=0){ loadedFiles.splice(already,1); renderCtxBar(); renderFilesList(); return; }
   const f=projectsFiles.find(x=>x.name===name); if(!f) return;
   try {
-    let text='';
-    if(f.handle) { const file=await f.handle.getFile(); text=await file.text(); }
-    else if(f._file) { text=await f._file.text(); }
-    else { toast('Cannot read file'); return; }
-    // Truncate to ~8000 chars to stay within token limits
-    if(text.length>8000) { text=text.slice(0,8000)+'\n\n[...file truncated...]'; }
-    loadedFiles.push({name,content:text});
-    toast('Loaded: '+name);
+    toast('Reading '+name+'…');
+    const content=await readFileForContext(f);
+    loadedFiles.push({name,content});
+    toast('Loaded: '+name+' ('+Math.ceil(content.length/1024)+'KB of context)');
   } catch(e){ toast('Could not read file: '+e.message); return; }
   renderCtxBar(); renderFilesList();
 }
